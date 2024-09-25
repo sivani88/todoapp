@@ -1,0 +1,40 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: todoapp-deployment
+  namespace: todoapp-namespace
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: todoapp-pod
+  template:
+    metadata:
+      labels:
+        app: todoapp-pod
+    spec:
+      containers:
+        - name: todoapp-conteneur
+          image: sivani88/todoapp:1.0.3 # Assurez-vous d'utiliser la dernière version de l'image
+          ports:
+            - containerPort: 8000
+          env:
+            - name: DJANGO_ALLOWED_HOSTS
+              value: "*" # En production, spécifiez les hôtes exacts
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: todoapp-service
+  namespace: todoapp-namespace
+  annotations:
+    service.beta.kubernetes.io/azure-load-balancer-internal: "true"
+spec:
+  selector:
+    app: todoapp-pod
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8000
+  type: LoadBalancer

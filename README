@@ -1,0 +1,192 @@
+# Application TodoList Django sur Kubernetes (IaaS Azure)
+
+Ce README détaille les étapes pour conteneuriser, déployer et monitorer une application Django TodoList sur un cluster Kubernetes déployé manuellement sur des VMs Azure.
+
+## Table des matières
+
+1. [Conteneurisation de l'application](#conteneurisation-de-lapplication)
+2. [Déploiement sur Kubernetes](#déploiement-sur-kubernetes)
+3. [Configuration du réseau](#configuration-du-réseau)
+4. [Commandes importantes](#commandes-importantes)
+5. [Monitoring avec Grafana](#monitoring-avec-grafana)
+
+## Conteneurisation de l'application
+
+### Création du Dockerfile
+
+Créez un fichier `Dockerfile` à la racine de votre projet Django :
+
+```dockerfile
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends gcc && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip install --upgrade pip && pip install -r requirements.txt
+
+COPY . .
+
+RUN mkdir -p staticfiles
+RUN python manage.py collectstatic --noinput
+
+EXPOSE 8000
+
+CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+```
+
+### Construction de l'image Docker
+
+```bash
+docker build -t sivani88/todoapp:1.0.0 .
+```
+
+### Push de l'image sur Docker Hub
+
+```bash
+docker login
+docker push sivani88/todoapp:1.0.0
+```
+
+## Déploiement sur Kubernetes
+
+### Fichier de déploiement Kubernetes
+
+Créez un fichier `todoapp-k8s.yaml` :
+
+```yaml
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mon-deployment
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mon-app
+  template:
+    metadata:
+      labels:
+        app: mon-app
+    spec:
+      containers:
+        - name: mon-conteneur
+          image: sivani88/todoapp:1.0.0
+          ports:
+            - containerPort: 8000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mon-service
+spec:
+  selector:
+    app: mon-app
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8000
+  type: NodePort # Ou LoadBalancer si vous utilisez MetalLB
+```
+
+### Déploiement sur le cluster
+
+```bash
+kubectl apply -f todoapp-k8s.yaml
+```
+
+## Configuration du réseau
+
+Pour permettre l'accès depuis une VM externe sur le même réseau Azure :
+
+1. Assurez-vous que toutes les VMs (cluster et VM externe) sont dans le même réseau virtuel Azure ou dans des réseaux peered.
+2. Configurez les groupes de sécurité réseau (NSGs) pour autoriser le trafic nécessaire.
+3. Si vous utilisez NodePort, notez le port attribué et configurez les règles de sécurité en conséquence.
+4. Si vous utilisez MetalLB, configurez-le pour utiliser une plage d'IP de votre réseau Azure.
+
+## Commandes importantes
+
+1. Construire l'image Docker :
+
+   ```bash
+   docker build -t sivani88/todoapp:1.0.0 .
+   ```
+
+2. Pousser l'image sur Docker Hub :
+
+   ```bash
+   docker push sivani88/todoapp:1.0.0
+   ```
+
+3. Appliquer la configuration Kubernetes :
+
+   ```bash
+   kubectl apply -f todoapp-k8s.yaml
+   ```
+
+4. Vérifier le statut du déploiement :
+
+   ```bash
+   kubectl get deployments
+   ```
+
+5. Vérifier les pods en cours d'exécution :
+
+   ```bash
+   kubectl get pods
+   ```
+
+6. Obtenir les détails du service :
+
+   ```bash
+   kubectl get service mon-service
+   ```
+
+7. Vérifier l'état du cluster :
+
+   ```bash
+   kubectl get nodes
+   ```
+
+8. Obtenir les logs d'un pod :
+   ```bash
+   kubectl logs <nom-du-pod>
+   ```
+
+## Monitoring avec Grafana
+
+Pour monitorer votre application web dans votre cluster Kubernetes avec Grafana :
+
+1. Installez Helm si ce n'est pas déjà fait :
+
+   ```bash
+   curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
+   ```
+
+2. Ajoutez le repo Prometheus et installez le stack de monitoring :
+
+   ```bash
+   helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+   helm install prometheus prometheus-community/kube-prometheus-stack
+   ```
+
+3. Accédez à Grafana via le service créé (utilisez `kubectl get services` pour trouver l'IP/port)
+
+4. Configurez des dashboards pour surveiller :
+
+   - Métriques du cluster Kubernetes (CPU, mémoire, pods)
+   - Métriques des pods de l'application
+   - Métriques de l'application Django (temps de réponse, taux d'erreurs)
+   - Métriques de base de données
+   - Métriques réseau
+
+5. Configurez des alertes pour les seuils critiques
+
+N'oubliez pas de configurer la rétention des données et d'optimiser la collecte de métriques pour éviter une surcharge du système.
+
+Assurez-vous également de sécuriser l'accès à votre cluster, de planifier des mises à jour régulières de Kubernetes et de vos VMs, et de mettre en place une stratégie de sauvegarde pour l'etcd et vos données d'application.
