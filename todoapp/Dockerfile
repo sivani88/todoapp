@@ -1,5 +1,5 @@
 # Utiliser une image de base Python officielle
-FROM --platform=$BUILDPLATFORM python:3.11-slim
+FROM  python:3.11-slim
 
 # Définir des variables d'environnement
 ENV PYTHONDONTWRITEBYTECODE 1
@@ -21,11 +21,12 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 # Copier le projet dans le conteneur
 COPY . .
 
-# Collecter les fichiers statiques
+# Exécuter les migrations et collecter les fichiers statiques
+RUN python manage.py migrate
 RUN python manage.py collectstatic --noinput
 
-# Exposer le port sur lequel l'application s'exécute
+# Exposer le port sur lequel Django fonctionnera
 EXPOSE 8000
 
-# Commande pour lancer l'application
+# Commande pour démarrer l'application Django
 CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
