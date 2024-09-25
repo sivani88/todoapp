@@ -21,7 +21,7 @@ echo "Clonage du dépôt GitHub..."
 git clone https://github.com/sivani88/todoapp.git
 cd todoapp
 
-# Gestion du problème potentiel de répertoire
+# Vérifier la présence du Dockerfile et déplacer les fichiers si nécessaire
 if [ ! -f Dockerfile ]; then
     echo "Dockerfile non trouvé dans le répertoire principal. Recherche dans les sous-répertoires..."
     DOCKERFILE_PATH=$(find . -name Dockerfile)
@@ -35,33 +35,17 @@ if [ ! -f Dockerfile ]; then
     fi
 fi
 
-# Création et activation de l'environnement virtuel
-echo "Configuration de l'environnement Python..."
-python3 -m venv venv
-source venv/bin/activate
-
-# Installation des dépendances Python
-echo "Installation des dépendances Python..."
-pip install -r requirements.txt
-
-# Construction de l'image Docker
-echo "Construction de l'image Docker..."
-docker build -t sivani88/todoapp:1.0.4 .
-
-# Connexion à Docker Hub
-echo "Connexion à Docker Hub..."
-echo "Veuillez entrer vos identifiants Docker Hub :"
-docker login
-
-# Construction de l'image Docker
+# Construire l'image Docker
 echo "Construction de l'image Docker..."
 docker build -t sivani88/todoapp:$VERSION .
+
+# Connexion à Docker Hub et push de l'image
+echo "Connexion à Docker Hub..."
+docker login
 
 # Push de l'image sur Docker Hub
 echo "Push de l'image sur Docker Hub..."
 docker push sivani88/todoapp:$VERSION
 
-
 echo "Installation et déploiement terminés !"
-echo "Pour activer l'environnement virtuel, utilisez : source venv/bin/activate"
 echo "Pour démarrer l'application localement, utilisez : docker run -p 8000:8000 sivani88/todoapp:$VERSION"
